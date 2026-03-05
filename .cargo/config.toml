@@ -1,0 +1,3 @@
+[build]
+# Uncomment This if  you are building from source.
+# rustflags = ["-Ctarget-cpu=native"]

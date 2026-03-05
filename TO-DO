@@ -1,0 +1,10 @@
+fix :
+2. fix foot & alacritty font detection. (BROKEN)
+3. fix UI & Terminal name detection (use better ways)
+5. fix/make Kernel version name cleaner
+6. use KiB to GiB in memory module instead of KB to GB
+7. use 365.25 instead of 365 in os_age ?
+8. fix os_age & package counts on many distros. ( void , fsd etc )
+
+DONE :
+1. All /modules have been fixed/rewritten.which app ?
