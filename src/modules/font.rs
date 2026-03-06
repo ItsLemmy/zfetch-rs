@@ -250,23 +250,42 @@ fn font_from_gnome_terminal_scan() -> Option<String> {
 // Parse WezTerm config (~/.config/wezterm/wezterm.lua)
 fn font_from_wezterm(config_home: &str) -> Option<String> {
     if config_home.is_empty() { return None; }
-    let path = format!("{}/wezterm/wezterm.lua", config_home);
-    let content = fs::read(&path).ok()?;
+    let home = env::var("HOME").unwrap_or_default();
+    let content = fs::read(format!("{}/wezterm/wezterm.lua", config_home))
+        .or_else(|_| fs::read(format!("{}/.wezterm.lua", home)))
+        .ok()?;
 
-    // Look for wezterm.font("Font Name") or wezterm.font_with_fallback({"Font Name"})
-    let pos = memmem::find(&content, b"wezterm.font(")
-        .or_else(|| memmem::find(&content, b"wezterm.font_with_fallback("))?;
-    let after = &content[pos..];
-    // Skip past the opening '('
-    let paren = memchr::memchr(b'(', after)?;
-    let after = &after[paren + 1..];
+    // Look for wezterm.font("Font Name"), wezterm.font { family = "Font Name" },
+    // or wezterm.font_with_fallback variations
+    let pos = memmem::find(&content, b"wezterm.font")
+        .filter(|&p| {
+            // Make sure it's wezterm.font( or wezterm.font{ or wezterm.font_with_fallback
+            let after = &content[p + 12..];
+            matches!(after.first(), Some(b'(' | b' ' | b'{' | b'_'))
+        })?;
+    let after = &content[pos + 12..];
 
-    // Skip optional '{' for font_with_fallback
+    // Try to find family = "..." pattern (table syntax)
+    if let Some(fam_pos) = memmem::find(after, b"family") {
+        let after_fam = &after[fam_pos + 6..];
+        // Skip whitespace and '='
+        let rest = after_fam.iter().position(|&b| b == b'=')?;
+        let after_eq = &after_fam[rest + 1..];
+        let start = memchr::memchr2(b'"', b'\'', after_eq)?;
+        let quote_char = after_eq[start];
+        let inner = &after_eq[start + 1..];
+        let end = memchr::memchr(quote_char, inner)?;
+        let font = std::str::from_utf8(&inner[..end]).ok()?.trim();
+        if !font.is_empty() {
+            return Some(clean_font_name(font));
+        }
+    }
+
+    // Fallback: direct string argument wezterm.font("Font Name")
     let start = memchr::memchr2(b'"', b'\'', after)?;
     let quote_char = after[start];
     let inner = &after[start + 1..];
     let end = memchr::memchr(quote_char, inner)?;
-
     let font = std::str::from_utf8(&inner[..end]).ok()?.trim();
     if !font.is_empty() {
         return Some(clean_font_name(font));
