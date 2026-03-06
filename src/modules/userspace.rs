@@ -205,13 +205,20 @@ pub fn packages() -> String {
 
     // Flatpak - count installed applications from both system and user installs
     {
+        use std::collections::HashSet;
+        let mut seen = HashSet::new();
         let mut count = 0;
-        if let Ok(entries) = fs::read_dir("/var/lib/flatpak/app") {
-            count += entries.filter(|e| e.is_ok()).count();
-        }
-        if let Ok(home) = env::var("HOME") {
-            if let Ok(entries) = fs::read_dir(format!("{}/.local/share/flatpak/app", home)) {
-                count += entries.filter(|e| e.is_ok()).count();
+        let dirs = [
+            Some("/var/lib/flatpak/app".to_string()),
+            env::var("HOME").ok().map(|h| format!("{}/.local/share/flatpak/app", h)),
+        ];
+        for dir in dirs.iter().flatten() {
+            if let Ok(entries) = fs::read_dir(dir) {
+                for e in entries.flatten() {
+                    if seen.insert(e.file_name()) {
+                        count += 1;
+                    }
+                }
             }
         }
         if count > 0 {
