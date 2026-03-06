@@ -412,7 +412,7 @@ pub fn terminal() -> String {
         return "WezTerm".to_string();
     }
     if env::var("PTYXIS_VERSION").is_ok() {
-    return "Ptyxis".to_string();
+        return "Ptyxis".to_string();
     }
     if env::var("ALACRITTY_SOCKET").is_ok() || env::var("ALACRITTY_LOG").is_ok() {
         return "Alacritty".to_string();
