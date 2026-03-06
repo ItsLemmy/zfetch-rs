@@ -2,9 +2,6 @@ fix :
 3. fix UI & Terminal name detection (use better ways)
 7. use 365.25 instead of 365 in os_age ?
 8. fix os_age & package counts on many distros. ( void , fsd etc )
-9. fix package count/package detection.
-11. add/fix wezterm & ptyxis & gnome-console detection
-12. maybe gnome-terminal (gtk3) detection ?
 13. make logic faster in (gpu)
 14. fix duplicate @ clock in some cpus ( add detection + make it only pick the @ greater one)
 15. os-age on arm void ?
