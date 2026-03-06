@@ -301,7 +301,7 @@ pub fn packages() -> String {
 
     // eopkg (Solus)
     if let Ok(entries) = fs::read_dir("/var/lib/eopkg/package") {
-        let count = entries.filter(|e| e.is_ok()).count();
+        let count = entries.filter_map(|e| e.ok()).filter(|e| e.file_type().map_or(false, |ft| ft.is_dir())).count();
         if count > 0 {
             let icon = if nerd { "" } else { "(eopkg)" };
             counts.push(format!("{} {}", icon, count));
