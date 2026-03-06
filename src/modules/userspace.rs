@@ -215,7 +215,7 @@ pub fn packages() -> String {
             }
         }
         if count > 0 {
-            let icon = if nerd { " " } else { "(flatpak)" };
+            let icon = if nerd { "" } else { "(flatpak)" };
             counts.push(format!("{} {}", icon, count));
         }
     }
