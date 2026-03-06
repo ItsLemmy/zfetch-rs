@@ -72,6 +72,8 @@ pub fn get_os_logo_lines(os_name: &str) -> Option<Vec<String>> {
     // Regular OS matching
     } else if os_lower.contains("cachyos") || os_lower.contains("cachy") {
         Some(ASCII_ART_CACHYOS)
+    } else if os_lower.contains("omarchy") {
+        Some(ASCII_ART_OMARCHY)
     } else if os_lower.contains("arch") {
         Some(ASCII_ART_ARCH)
     } else if os_lower.contains("fedora") {
@@ -94,8 +96,6 @@ pub fn get_os_logo_lines(os_name: &str) -> Option<Vec<String>> {
         Some(ASCII_ART_BAZZITE)
     } else if os_lower.contains("aurora") {
         Some(ASCII_ART_AURORA)
-    } else if os_lower.contains("omarchy") {
-        Some(ASCII_ART_OMARCHY)
     } else if os_lower.contains("mint") {
         Some(ASCII_ART_MINT)
     } else if os_lower.contains("nobara") {
@@ -121,6 +121,8 @@ pub fn get_os_logo_lines_small(os_name: &str) -> Option<Vec<String>> {
     // Regular OS matching
     } else if os_lower.contains("cachyos") || os_lower.contains("cachy") {
         Some(ASCII_ART_CACHYOS_SMALL)
+    } else if os_lower.contains("omarchy") {
+        Some(ASCII_ART_OMARCHY_SMALL)
     } else if os_lower.contains("arch") {
         Some(ASCII_ART_ARCH_SMALL)
     } else if os_lower.contains("fedora") {
@@ -143,8 +145,6 @@ pub fn get_os_logo_lines_small(os_name: &str) -> Option<Vec<String>> {
         Some(ASCII_ART_BAZZITE_SMALL)
     } else if os_lower.contains("aurora") {
         Some(ASCII_ART_AURORA_SMALL)
-    } else if os_lower.contains("omarchy") {
-        Some(ASCII_ART_OMARCHY_SMALL)
     } else if os_lower.contains("mint") {
         Some(ASCII_ART_MINT_SMALL)
     } else if os_lower.contains("nobara") {
