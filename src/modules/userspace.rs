@@ -243,15 +243,19 @@ pub fn packages() -> String {
         }
     }
 
-    // XBPS (Void Linux) - query via xbps-query -l and count lines
-    if Path::new("/var/db/xbps").exists() {
-        if let Ok(output) = Command::new("xbps-query").arg("-l").output() {
-        let count = output.stdout.split(|&b| b == b'\n')
-            .filter(|line| line.starts_with(b"ii "))
-            .count();
-            if count > 0 {
-                let icon = if nerd { "" } else { "(xbps)" };
-                counts.push(format!("{} {}", icon, count));
+    // XBPS (Void Linux) - find pkgdb dir and count package subdirs
+    if let Ok(entries) = fs::read_dir("/var/db/xbps") {
+        if let Some(pkgdb) = entries.filter_map(|e| e.ok())
+            .find(|e| e.file_name().as_encoded_bytes().starts_with(b"pkgdb"))
+        {
+            if let Ok(pkgs) = fs::read_dir(pkgdb.path()) {
+                let count = pkgs.filter_map(|e| e.ok())
+                    .filter(|e| e.file_type().map_or(false, |ft| ft.is_dir()))
+                    .count();
+                if count > 0 {
+                    let icon = if nerd { "" } else { "(xbps)" };
+                    counts.push(format!("{} {}", icon, count));
+                }
             }
         }
     }
@@ -400,6 +404,9 @@ pub fn terminal() -> String {
     if env::var("WEZTERM_PANE").is_ok() {
         return "WezTerm".to_string();
     }
+    if env::var("PTYXIS_VERSION").is_ok() {
+    return "Ptyxis".to_string();
+    }
     if env::var("ALACRITTY_SOCKET").is_ok() || env::var("ALACRITTY_LOG").is_ok() {
         return "Alacritty".to_string();
     }
@@ -411,6 +418,11 @@ pub fn terminal() -> String {
     }
     if env::var("FOOT_SERVER_SOCKET").is_ok() {
         return "Foot".to_string();
+    }
+    if let Ok(term_program) = env::var("TERM_PROGRAM") {
+        if term_program == "kgx" {
+            return "GNOME Console".to_string();
+        }
     }
     if let Ok(term) = env::var("TERM") {
         if term == "foot" || term == "foot-extra" {
