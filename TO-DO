@@ -5,6 +5,16 @@ fix :
 6. use KiB to GiB in memory module instead of KB to GB
 7. use 365.25 instead of 365 in os_age ?
 8. fix os_age & package counts on many distros. ( void , fsd etc )
+9. fix package count/package detection.
+10. add/fix flatpak icon ( userspace/package)
+11. add/fix wezterm & ptyxis & gnome-console detection
+12. maybe gnome-terminal (gtk3) detection ?
+13. make logic faster in (gpu)
+14. fix duplicate @ clock in some cpus ( add detection + make it only pick the @ greater one)
+15. os-age on arm void ?
+16. better os-age module ?
+17. fix acii module ( omarchy & arch in --os will make it confused)
+18. make it have better AMD gpu names ( amd sucks at naming their gpus in sysfs maake it use vulkaninfo if it detects / in name)
 
 DONE :
 1. All /modules have been fixed/rewritten.which app ?
