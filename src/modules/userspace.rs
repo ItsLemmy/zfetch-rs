@@ -119,7 +119,7 @@ fn count_rpm_sqlite(db_path: &str) -> Option<usize> {
         return None;
     }
 
-    let sql = b"SELECT count(*) FROM Sigmd5\0";
+    let sql = b"SELECT count(*) FROM Packages\0";
     let mut stmt: *mut c_void = std::ptr::null_mut();
     let rc = unsafe { sqlite3_prepare_v2(db, sql.as_ptr() as *const c_char, -1, &mut stmt, std::ptr::null_mut()) };
     if rc != SQLITE_OK {
@@ -246,7 +246,9 @@ pub fn packages() -> String {
     // XBPS (Void Linux) - query via xbps-query -l and count lines
     if Path::new("/var/db/xbps").exists() {
         if let Ok(output) = Command::new("xbps-query").arg("-l").output() {
-            let count = memchr_iter(b'\n', &output.stdout).count();
+        let count = output.stdout.split(|&b| b == b'\n')
+            .filter(|line| line.starts_with(b"ii "))
+            .count();
             if count > 0 {
                 let icon = if nerd { "" } else { "(xbps)" };
                 counts.push(format!("{} {}", icon, count));
@@ -269,6 +271,28 @@ pub fn packages() -> String {
             .sum();
         if count > 0 {
             let icon = if nerd { "" } else { "(portage)" };
+            counts.push(format!("{} {}", icon, count));
+        }
+    }
+    
+    // apk (Alpine)
+    if Path::new("/lib/apk/db/installed").exists() {
+        if let Ok(content) = fs::read("/lib/apk/db/installed") {
+            let count = content.split(|&b| b == b'\n')
+                .filter(|line| line.starts_with(b"P:"))
+                .count();
+            if count > 0 {
+                let icon = if nerd { "" } else { "(apk)" };
+                counts.push(format!("{} {}", icon, count));
+            }
+        }
+    }
+
+    // eopkg (Solus)
+    if let Ok(entries) = fs::read_dir("/var/lib/eopkg/package") {
+        let count = entries.filter(|e| e.is_ok()).count();
+        if count > 0 {
+            let icon = if nerd { "" } else { "(eopkg)" };
             counts.push(format!("{} {}", icon, count));
         }
     }
