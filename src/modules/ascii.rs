@@ -94,7 +94,7 @@ pub fn get_os_logo_lines(os_name: &str) -> Option<Vec<String>> {
         Some(ASCII_ART_BAZZITE)
     } else if os_lower.contains("aurora") {
         Some(ASCII_ART_AURORA)
-    } else if os_lower.contains("omakub") {
+    } else if os_lower.contains("omarchy") {
         Some(ASCII_ART_OMARCHY)
     } else if os_lower.contains("mint") {
         Some(ASCII_ART_MINT)
@@ -143,7 +143,7 @@ pub fn get_os_logo_lines_small(os_name: &str) -> Option<Vec<String>> {
         Some(ASCII_ART_BAZZITE_SMALL)
     } else if os_lower.contains("aurora") {
         Some(ASCII_ART_AURORA_SMALL)
-    } else if os_lower.contains("omakub") {
+    } else if os_lower.contains("omarchy") {
         Some(ASCII_ART_OMARCHY_SMALL)
     } else if os_lower.contains("mint") {
         Some(ASCII_ART_MINT_SMALL)
