@@ -43,10 +43,10 @@ fn cpu_fresh() -> String {
         let name = std::str::from_utf8(name_bytes).ok()?;
         let words: Vec<&str> = name.split_whitespace().collect();
 
-        // Find where GPU info starts (e.g., "with Radeon Graphics", "w/ Intel UHD")
+        // Find where GPU info or clock speed starts (e.g., "with Radeon Graphics", "w/ Intel UHD", "@ 2.80GHz")
         let gpu_start = words
             .iter()
-            .position(|&w| w.eq_ignore_ascii_case("with") || w.eq_ignore_ascii_case("w/"));
+            .position(|&w| w.eq_ignore_ascii_case("with") || w.eq_ignore_ascii_case("w/") || w == "@");
         let words = match gpu_start {
             Some(idx) => &words[..idx],
             None => &words[..],
@@ -76,13 +76,6 @@ fn cpu_fresh() -> String {
     let model = match model {
         Some(m) => m,
         None => return "unknown".to_string(),
-    };
-
-    // Strip existing @ clock from model name if present (e.g. "i7-10750H @ 2.60GHz")
-    let model = if let Some(at_pos) = memchr::memchr(b'@', model.as_bytes()) {
-        model[..at_pos].trim_end().to_string()
-    } else {
-        model
     };
 
     // Get boost clock from cpufreq (in kHz)
