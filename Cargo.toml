@@ -15,6 +15,7 @@ clap = { version = "4.5.53", features = ["derive"] }
 kitty_image = "0.1"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif"] }
 libc = "0.2"
+base64 = "0.21"
 memchr = "2.7"
 ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
 crossterm = "0.29.0"
