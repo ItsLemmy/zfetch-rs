@@ -78,6 +78,13 @@ fn cpu_fresh() -> String {
         None => return "unknown".to_string(),
     };
 
+    // Strip existing @ clock from model name if present (e.g. "i7-10750H @ 2.60GHz")
+    let model = if let Some(at_pos) = memchr::memchr(b'@', model.as_bytes()) {
+        model[..at_pos].trim_end().to_string()
+    } else {
+        model
+    };
+
     // Get boost clock from cpufreq (in kHz)
     let boost_clock = read_first_line("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq")
         .and_then(|khz_str| khz_str.parse::<u64>().ok())

@@ -152,6 +152,7 @@ jobs:
           VERSION=${VERSION#v}
           BRANCH=${GITHUB_REF#refs/heads/}
           if [ "$BRANCH" = "unstable" ]; then
+            VERSION=${VERSION%-unstable}
             BINARY_NAME="zfetch-${VERSION}-unstable-${{ matrix.suffix }}"
           else
             BINARY_NAME="zfetch-${VERSION}-${{ matrix.suffix }}"
