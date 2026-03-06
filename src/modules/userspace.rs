@@ -432,7 +432,8 @@ pub fn terminal() -> String {
 
     // Fallback to TERM_PROGRAM or TERM
     let term = env::var("TERM_PROGRAM")
-        .unwrap_or_else(|_| env::var("TERM").unwrap_or_else(|_| "unknown".to_string()));
+        .or_else(|_| env::var("TERM"))
+        .unwrap_or_else(|_| "unknown".to_string());
 
     // Clean up common suffixes like -256color
     let name = term.split("-256color").next().unwrap_or(&term);
