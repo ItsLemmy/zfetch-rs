@@ -15,6 +15,3 @@ fix :
 16. better os-age module ?
 17. fix acii module ( omarchy & arch in --os will make it confused)
 18. make it have better AMD gpu names ( amd sucks at naming their gpus in sysfs maake it use vulkaninfo if it detects / in name)
-
-DONE :
-1. All /modules have been fixed/rewritten.which app ?
