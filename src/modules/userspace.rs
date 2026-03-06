@@ -150,7 +150,7 @@ pub fn packages() -> String {
 
     // Pacman - count directories in /var/lib/pacman/local/
     if let Ok(entries) = fs::read_dir("/var/lib/pacman/local") {
-        let count = entries.filter(|e| e.is_ok()).count();
+        let count = entries.filter_map(|e| e.ok()).filter(|e| e.file_type().map_or(false, |ft| ft.is_dir())).count();
         if count > 0 {
             let icon = if nerd { "󰮯" } else { "(pacman)" };
             counts.push(format!("{} {}", icon, count));
