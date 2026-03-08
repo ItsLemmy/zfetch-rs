@@ -1,5 +1,4 @@
 // Userspace/software/whatever information modules for zfetch
-// Fine for now , has some issues (fix in v3)
 
 use std::env;
 use std::fs;
@@ -145,7 +144,7 @@ fn count_rpm_sqlite(db_path: &str) -> Option<usize> {
 // Get the total number of installed packages.
 // Supports pacman aka Arch, hopefully supports debian and fedora but idk, im not setting up a vm to test sorry
 pub fn packages() -> String {
-    let mut counts: Vec<String> = Vec::with_capacity(4);
+    let mut counts: Vec<String> = Vec::with_capacity(9);
     let nerd = get_cached_is_nerd_font();
 
     // Pacman - count directories in /var/lib/pacman/local/
@@ -387,8 +386,10 @@ pub fn wm() -> String {
             let cmdline_path = entry.path().join("cmdline");
             // Read as bytes to avoid UTF-8 conversion overhead
             if let Ok(cmdline) = fs::read(&cmdline_path) {
+                let argv0 = cmdline.split(|&b| b == 0).next().unwrap_or(&cmdline);
+                let bin = argv0.rsplit(|&b| b == b'/').next().unwrap_or(argv0);
                 for (wm_search, wm_display) in wm_list {
-                    if memmem::find(&cmdline, wm_search).is_some() {
+                    if memmem::find(bin, wm_search).is_some() {
                         return wm_display.to_string();
                     }
                 }
@@ -484,7 +485,7 @@ pub fn ui() -> String {
                     }
                     return name;
                 }
-                //i know this janky but idk, its a fallback
+                // Fallback: check for common shell processes
                 if memmem::find(&cmdline, b"plasmashell").is_some() {
                     return "Plasma Shell".to_string();
                 }
@@ -503,8 +504,14 @@ pub fn ui() -> String {
         match desktop.to_lowercase().as_str() {
             "kde" | "plasma" => return "Plasma Shell".to_string(),
             "gnome" => return "Gnome Shell".to_string(),
-            _ => {}
+            "hyprland" => return "Hyprland".to_string(),
+            "sway" => return "Sway".to_string(),
+            _ => return capitalize(&desktop),
         }
+    }
+
+    if let Ok(session) = env::var("DESKTOP_SESSION") {
+        return capitalize(&session);
     }
 
     "unknown".to_string()
