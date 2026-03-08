@@ -20,13 +20,13 @@ const ASCII_ART_NIX: &str = include_str!("../assets/distros/full/nix.txt");
 const ASCII_ART_GENTOO: &str = include_str!("../assets/distros/full/gentoo.txt");
 const ASCII_ART_VOID: &str = include_str!("../assets/distros/full/void.txt");
 const ASCII_ART_PIKA: &str = include_str!("../assets/distros/full/pika.txt");
-const ASCII_ART_ZODIUM: &str = include_str!("../assets/distros/full/zodium.txt");
 const ASCII_ART_DEBIAN: &str = include_str!("../assets/distros/full/debian.txt");
 const ASCII_ART_BAZZITE: &str = include_str!("../assets/distros/full/bazzite.txt");
 const ASCII_ART_AURORA: &str = include_str!("../assets/distros/full/aurora.txt");
 const ASCII_ART_OMARCHY: &str = include_str!("../assets/distros/full/omarchy.txt");
 const ASCII_ART_MINT: &str = include_str!("../assets/distros/full/mint.txt");
 const ASCII_ART_NOBARA: &str = include_str!("../assets/distros/full/nobara.txt");
+const ASCII_ART_ZODIUM: &str = include_str!("../assets/distros/full/zodium.txt");
 
 // Meme versions
 const ASCII_ART_ARCHMEME: &str = include_str!("../assets/distros/meme/arch-meme.txt");
@@ -41,13 +41,13 @@ const ASCII_ART_NIX_SMALL: &str = include_str!("../assets/distros/small/nix-smal
 const ASCII_ART_GENTOO_SMALL: &str = include_str!("../assets/distros/small/gentoo-small.txt");
 const ASCII_ART_VOID_SMALL: &str = include_str!("../assets/distros/small/void-small.txt");
 const ASCII_ART_PIKA_SMALL: &str = include_str!("../assets/distros/small/pika-small.txt");
-const ASCII_ART_ZODIUM_SMALL: &str = include_str!("../assets/distros/small/zodium-small.txt");
 const ASCII_ART_DEBIAN_SMALL: &str = include_str!("../assets/distros/small/debian-small.txt");
 const ASCII_ART_BAZZITE_SMALL: &str = include_str!("../assets/distros/small/bazzite-small.txt");
 const ASCII_ART_AURORA_SMALL: &str = include_str!("../assets/distros/small/aurora-small.txt");
 const ASCII_ART_OMARCHY_SMALL: &str = include_str!("../assets/distros/small/omarchy-small.txt");
 const ASCII_ART_MINT_SMALL: &str = include_str!("../assets/distros/small/mint-small.txt");
 const ASCII_ART_NOBARA_SMALL: &str = include_str!("../assets/distros/small/nobara-small.txt");
+const ASCII_ART_ZODIUM_SMALL: &str = include_str!("../assets/distros/small/zodium-small.txt");
 
 // Render the wide ASCII art logo and return lines as a Vec
 pub fn get_wide_logo_lines() -> Vec<String> {
@@ -88,8 +88,6 @@ pub fn get_os_logo_lines(os_name: &str) -> Option<Vec<String>> {
         Some(ASCII_ART_VOID)
     } else if os_lower.contains("pika") {
         Some(ASCII_ART_PIKA)
-    } else if os_lower.contains("zodium") {
-        Some(ASCII_ART_ZODIUM)
     } else if os_lower.contains("debian") {
         Some(ASCII_ART_DEBIAN)
     } else if os_lower.contains("bazzite") {
@@ -100,6 +98,8 @@ pub fn get_os_logo_lines(os_name: &str) -> Option<Vec<String>> {
         Some(ASCII_ART_MINT)
     } else if os_lower.contains("nobara") {
         Some(ASCII_ART_NOBARA)
+    } else if os_lower.contains("zodium") {
+        Some(ASCII_ART_ZODIUM)
     } else {
         None
     };
@@ -137,8 +137,6 @@ pub fn get_os_logo_lines_small(os_name: &str) -> Option<Vec<String>> {
         Some(ASCII_ART_VOID_SMALL)
     } else if os_lower.contains("pika") {
         Some(ASCII_ART_PIKA_SMALL)
-    } else if os_lower.contains("zodium") {
-        Some(ASCII_ART_ZODIUM_SMALL)
     } else if os_lower.contains("debian") {
         Some(ASCII_ART_DEBIAN_SMALL)
     } else if os_lower.contains("bazzite") {
@@ -149,7 +147,8 @@ pub fn get_os_logo_lines_small(os_name: &str) -> Option<Vec<String>> {
         Some(ASCII_ART_MINT_SMALL)
     } else if os_lower.contains("nobara") {
         Some(ASCII_ART_NOBARA_SMALL)
-
+    } else if os_lower.contains("zodium") {
+        Some(ASCII_ART_ZODIUM_SMALL)
     } else {
         None
     };
