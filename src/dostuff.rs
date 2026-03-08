@@ -41,8 +41,12 @@ pub fn load_sections(config: &Config) -> (Section, Section, Section) {
     let memory = if config.hardware.memory { Some(modules::hardware::memory()) } else { None };
     let battery = if config.hardware.battery { Some(modules::hardware::laptop_battery()) } else { None };
     let terminal = if config.userspace.terminal { Some(modules::userspace::terminal()) } else { None };
-    let wm = if config.userspace.wm { Some(modules::userspace::wm()) } else { None };
-    let ui = if config.userspace.ui { Some(modules::userspace::ui()) } else { None };
+    let wm_handler = if config.userspace.wm {
+        Some(thread::spawn(modules::userspace::wm))
+    } else { None };
+    let ui_handler = if config.userspace.ui {
+        Some(thread::spawn(modules::userspace::ui))
+    } else { None };
     let editor = if config.userspace.editor { Some(modules::userspace::editor()) } else { None };
 
     // Build core section - OS info, kernel version, system uptime, init system, OS age.
@@ -95,8 +99,12 @@ pub fn load_sections(config: &Config) -> (Section, Section, Section) {
     if let Some(h) = shell_handler {
         userspace_lines.push(("Shell".to_string(), h.join().unwrap_or_else(|_| "error".into())));
     }
-    if let Some(v) = wm { userspace_lines.push(("WM".to_string(), v)); }
-    if let Some(v) = ui { userspace_lines.push(("UI".to_string(), v)); }
+    if let Some(h) = wm_handler {
+        userspace_lines.push(("WM".to_string(), h.join().unwrap_or_else(|_| "error".into())));
+    }
+    if let Some(h) = ui_handler {
+        userspace_lines.push(("UI".to_string(), h.join().unwrap_or_else(|_| "error".into())));
+    }
     if let Some(v) = editor {
         // Only show editor if one was detected.
         if !v.is_empty() {
