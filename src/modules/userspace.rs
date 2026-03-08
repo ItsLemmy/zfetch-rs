@@ -386,10 +386,8 @@ pub fn wm() -> String {
             let cmdline_path = entry.path().join("cmdline");
             // Read as bytes to avoid UTF-8 conversion overhead
             if let Ok(cmdline) = fs::read(&cmdline_path) {
-                let argv0 = cmdline.split(|&b| b == 0).next().unwrap_or(&cmdline);
-                let bin = argv0.rsplit(|&b| b == b'/').next().unwrap_or(argv0);
                 for (wm_search, wm_display) in wm_list {
-                    if memmem::find(bin, wm_search).is_some() {
+                    if memmem::find(&cmdline, wm_search).is_some() {
                         return wm_display.to_string();
                     }
                 }
