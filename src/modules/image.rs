@@ -8,9 +8,9 @@ use std::path::Path;
 // Default zfetch image embedded in the binary
 const DEFAULT_IMAGE: &[u8] = include_bytes!("../assets/default/zfetch.png");
 
-// Check if running in Konsole (requires direct transmission)
-fn is_konsole() -> bool {
-    env::var("KONSOLE_VERSION").is_ok()
+// Check if terminal requires direct transmission (no file-based Kitty protocol support)
+fn needs_direct_transmission() -> bool {
+    env::var("KONSOLE_VERSION").is_ok() || env::var("WEZTERM_PANE").is_ok()
 }
 
 // Display an image using the Kitty graphics protocol.
@@ -39,7 +39,7 @@ pub fn display_image(path: &Path, box_cols: u16, box_rows: u16) -> Result<String
 // Display a static image using Kitty protocol
 fn display_kitty_static(path: &Path, box_cols: u16, box_rows: u16) -> Result<String, String> {
     // Konsole only supports direct transmission, not file-based
-    if is_konsole() {
+    if needs_direct_transmission() {
         return display_kitty_direct(path, box_cols, box_rows);
     }
 
@@ -57,13 +57,13 @@ fn display_kitty_static(path: &Path, box_cols: u16, box_rows: u16) -> Result<Str
         },
     );
 
-    let command = kitty_image::Command::with_payload_from_path(action, path);
+    let mut command = kitty_image::Command::with_payload_from_path(action, path);
+    command.quietness = kitty_image::Quietness::SuppressAll;
     Ok(kitty_image::WrappedCommand::new(command).to_string())
 }
 
 // Display image using direct transmission for terminals like Konsole
 fn display_kitty_direct(path: &Path, box_cols: u16, box_rows: u16) -> Result<String, String> {
-    use std::io::Write;
 
     // Load and encode image as PNG
     let img = image::open(path).map_err(|e| format!("Failed to load image: {e}"))?;
@@ -85,17 +85,43 @@ fn display_kitty_direct(path: &Path, box_cols: u16, box_rows: u16) -> Result<Str
         },
     );
 
-    let mut command = kitty_image::Command::new(action);
-    command.payload = rgba.into_raw().into();
+    let raw_payload = rgba.into_raw();
 
-    // Use chunked sending for large payloads
-    let wrapped = kitty_image::WrappedCommand::new(command);
+    // Send chunked with q=2 on every chunk to suppress terminal responses
+    send_kitty_chunked(&action, &raw_payload, box_cols, box_rows)
+}
+
+// Send image data in chunks with q=2 (suppress responses) on every chunk.
+// The kitty_image crate's send_chunked only sets quietness on the first chunk,
+// causing terminals like WezTerm to send responses on continuation chunks.
+fn send_kitty_chunked(action: &kitty_image::Action, payload: &[u8], _cols: u16, _rows: u16) -> Result<String, String> {
+    use std::io::Write;
+    use base64::Engine;
+
     let mut stdout = std::io::stdout().lock();
-    wrapped
-        .send_chunked(&mut stdout)
-        .map_err(|e| format!("Failed to send image: {e}"))?;
-    let _ = stdout.flush();
+    let chunks: Vec<&[u8]> = payload.chunks(3072).collect();
+    let total = chunks.len();
 
+    for (i, chunk) in chunks.iter().enumerate() {
+        let more = if i + 1 < total { 1 } else { 0 };
+
+        if i == 0 {
+            // First chunk: include full action header with q=2
+            let mut cmd = kitty_image::Command::new(*action);
+            cmd.quietness = kitty_image::Quietness::SuppressAll;
+            cmd.m = more == 1;
+            cmd.payload = chunk.to_vec().into();
+            let wrapped = kitty_image::WrappedCommand::new(cmd);
+            write!(stdout, "{wrapped}").map_err(|e| format!("Failed to send image: {e}"))?;
+        } else {
+            // Continuation chunks: include q=2 to suppress responses
+            let encoded = base64::engine::general_purpose::STANDARD.encode(chunk);
+            write!(stdout, "\x1b_Gq=2,a={},m={more};{encoded}\x1b\\", action.char())
+                .map_err(|e| format!("Failed to send image: {e}"))?;
+        }
+    }
+
+    let _ = stdout.flush();
     Ok(String::new())
 }
 
@@ -130,7 +156,7 @@ fn display_kitty_gif(path: &Path, box_cols: u16, box_rows: u16) -> Result<String
 // Display the embedded default zfetch image
 pub fn display_default_image(box_cols: u16, box_rows: u16) -> Result<String, String> {
     // For Konsole, use direct transmission (it doesn't support file-based)
-    if is_konsole() {
+    if needs_direct_transmission() {
         return display_image_bytes(DEFAULT_IMAGE, box_cols, box_rows);
     }
 
@@ -162,13 +188,13 @@ pub fn display_default_image(box_cols: u16, box_rows: u16) -> Result<String, Str
         },
     );
 
-    let command = kitty_image::Command::with_payload_from_path(action, &cache_path);
+    let mut command = kitty_image::Command::with_payload_from_path(action, &cache_path);
+    command.quietness = kitty_image::Quietness::SuppressAll;
     Ok(kitty_image::WrappedCommand::new(command).to_string())
 }
 
 // Display an image from raw bytes using Kitty protocol
 fn display_image_bytes(data: &[u8], box_cols: u16, box_rows: u16) -> Result<String, String> {
-    use std::io::Write;
 
     let img = image::load_from_memory(data).map_err(|e| format!("Failed to load image: {e}"))?;
     let rgba = img.to_rgba8();
@@ -189,15 +215,8 @@ fn display_image_bytes(data: &[u8], box_cols: u16, box_rows: u16) -> Result<Stri
         },
     );
 
-    let mut command = kitty_image::Command::new(action);
-    command.payload = rgba.into_raw().into();
-
-    let wrapped = kitty_image::WrappedCommand::new(command);
-    let mut stdout = std::io::stdout().lock();
-    wrapped
-        .send_chunked(&mut stdout)
-        .map_err(|e| format!("Failed to send image: {e}"))?;
-    let _ = stdout.flush();
+    let raw_payload = rgba.into_raw();
+    send_kitty_chunked(&action, &raw_payload, box_cols, box_rows)?;
 
     Ok(String::new())
 }

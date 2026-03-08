@@ -1,5 +1,4 @@
 // Userspace/software/whatever information modules for zfetch
-// Fine for now , has some issues (fix in v3)
 
 use std::env;
 use std::fs;
@@ -145,12 +144,12 @@ fn count_rpm_sqlite(db_path: &str) -> Option<usize> {
 // Get the total number of installed packages.
 // Supports pacman aka Arch, hopefully supports debian and fedora but idk, im not setting up a vm to test sorry
 pub fn packages() -> String {
-    let mut counts: Vec<String> = Vec::with_capacity(4);
+    let mut counts: Vec<String> = Vec::with_capacity(9);
     let nerd = get_cached_is_nerd_font();
 
     // Pacman - count directories in /var/lib/pacman/local/
     if let Ok(entries) = fs::read_dir("/var/lib/pacman/local") {
-        let count = entries.filter(|e| e.is_ok()).count();
+        let count = entries.filter_map(|e| e.ok()).filter(|e| e.file_type().map_or(false, |ft| ft.is_dir())).count();
         if count > 0 {
             let icon = if nerd { "󰮯" } else { "(pacman)" };
             counts.push(format!("{} {}", icon, count));
@@ -205,13 +204,20 @@ pub fn packages() -> String {
 
     // Flatpak - count installed applications from both system and user installs
     {
+        use std::collections::HashSet;
+        let mut seen = HashSet::new();
         let mut count = 0;
-        if let Ok(entries) = fs::read_dir("/var/lib/flatpak/app") {
-            count += entries.filter(|e| e.is_ok()).count();
-        }
-        if let Ok(home) = env::var("HOME") {
-            if let Ok(entries) = fs::read_dir(format!("{}/.local/share/flatpak/app", home)) {
-                count += entries.filter(|e| e.is_ok()).count();
+        let dirs = [
+            Some("/var/lib/flatpak/app".to_string()),
+            env::var("HOME").ok().map(|h| format!("{}/.local/share/flatpak/app", h)),
+        ];
+        for dir in dirs.iter().flatten() {
+            if let Ok(entries) = fs::read_dir(dir) {
+                for e in entries.flatten() {
+                    if seen.insert(e.file_name()) {
+                        count += 1;
+                    }
+                }
             }
         }
         if count > 0 {
@@ -294,7 +300,7 @@ pub fn packages() -> String {
 
     // eopkg (Solus)
     if let Ok(entries) = fs::read_dir("/var/lib/eopkg/package") {
-        let count = entries.filter(|e| e.is_ok()).count();
+        let count = entries.filter_map(|e| e.ok()).filter(|e| e.file_type().map_or(false, |ft| ft.is_dir())).count();
         if count > 0 {
             let icon = if nerd { "" } else { "(eopkg)" };
             counts.push(format!("{} {}", icon, count));
@@ -380,8 +386,10 @@ pub fn wm() -> String {
             let cmdline_path = entry.path().join("cmdline");
             // Read as bytes to avoid UTF-8 conversion overhead
             if let Ok(cmdline) = fs::read(&cmdline_path) {
+                let argv0 = cmdline.split(|&b| b == 0).next().unwrap_or(&cmdline);
+                let bin = argv0.rsplit(|&b| b == b'/').next().unwrap_or(argv0);
                 for (wm_search, wm_display) in wm_list {
-                    if memmem::find(&cmdline, wm_search).is_some() {
+                    if memmem::find(bin, wm_search).is_some() {
                         return wm_display.to_string();
                     }
                 }
@@ -405,7 +413,7 @@ pub fn terminal() -> String {
         return "WezTerm".to_string();
     }
     if env::var("PTYXIS_VERSION").is_ok() {
-    return "Ptyxis".to_string();
+        return "Ptyxis".to_string();
     }
     if env::var("ALACRITTY_SOCKET").is_ok() || env::var("ALACRITTY_LOG").is_ok() {
         return "Alacritty".to_string();
@@ -477,7 +485,7 @@ pub fn ui() -> String {
                     }
                     return name;
                 }
-                //i know this janky but idk, its a fallback
+                // Fallback: check for common shell processes
                 if memmem::find(&cmdline, b"plasmashell").is_some() {
                     return "Plasma Shell".to_string();
                 }
@@ -496,8 +504,14 @@ pub fn ui() -> String {
         match desktop.to_lowercase().as_str() {
             "kde" | "plasma" => return "Plasma Shell".to_string(),
             "gnome" => return "Gnome Shell".to_string(),
-            _ => {}
+            "hyprland" => return "Hyprland".to_string(),
+            "sway" => return "Sway".to_string(),
+            _ => return capitalize(&desktop),
         }
+    }
+
+    if let Ok(session) = env::var("DESKTOP_SESSION") {
+        return capitalize(&session);
     }
 
     "unknown".to_string()

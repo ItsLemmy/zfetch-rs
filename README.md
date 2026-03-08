@@ -1,4 +1,4 @@
-![zfetch Logo](https://raw.githubusercontent.com/zodium-project/zfetch/refs/heads/stable/zfetch.png)
+![zfetch Logo](https://raw.githubusercontent.com/zodium-project/zfetch-rs/refs/heads/stable/zfetch.png)
 
 Official Fetch Script/Application on Zodium Project.
 
@@ -44,8 +44,8 @@ you can use the provided precompiled binary in release section.
 ```
 ## Screenshots
 
-![zfetch preview 1](https://raw.githubusercontent.com/zodium-project/zfetch/refs/heads/stable/preview-1.png)
+![zfetch preview 1](https://raw.githubusercontent.com/zodium-project/zfetch-rs/refs/heads/stable/preview-1.png)
 
-![zfetch preview 2](https://raw.githubusercontent.com/zodium-project/zfetch/refs/heads/stable/preview-2.png)
+![zfetch preview 2](https://raw.githubusercontent.com/zodium-project/zfetch-rs/refs/heads/stable/preview-2.png)
 
-![zfetch preview 3](https://raw.githubusercontent.com/zodium-project/zfetch/refs/heads/stable/preview-3.png)
+![zfetch preview 3](https://raw.githubusercontent.com/zodium-project/zfetch-rs/refs/heads/stable/preview-3.png)

@@ -7,7 +7,27 @@ pub fn kernel() -> String {
     #[cfg(target_os = "linux")]
     {
         read_first_line("/proc/sys/kernel/osrelease")
-            .map(|s| s.split('-').next().unwrap_or(&s).to_string())
+            .map(|s| {
+                // Strip trailing architecture suffix (e.g. .x86_64, .aarch64, .i686, .armv7l, .ppc64le)
+                let s = s.rsplit_once('.')
+                    .filter(|(_, arch)| matches!(*arch,
+                        "x86_64" | "i686" | "i386" | "aarch64" | "armv7l" | "armv7hl" |
+                        "armv6l" | "ppc64le" | "ppc64" | "s390x" | "riscv64"
+                    ))
+                    .map(|(rest, _)| rest)
+                    .unwrap_or(&s);
+                // Strip distro/build tag (e.g. .fc43, .el9, .mga9)
+                let s = s.rsplit_once('.')
+                    .filter(|(_, tag)| {
+                        let bytes = tag.as_bytes();
+                        bytes.len() >= 2
+                            && bytes[..2].iter().all(|b| b.is_ascii_alphabetic())
+                            && bytes[2..].iter().all(|b| b.is_ascii_digit())
+                    })
+                    .map(|(rest, _)| rest)
+                    .unwrap_or(s);
+                s.to_string()
+            })
             .unwrap_or_else(|| UNKNOWN.to_string())
     }
 

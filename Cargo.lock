@@ -1024,8 +1024,9 @@ dependencies = [
 
 [[package]]
 name = "zfetch"
-version = "2.4.0"
+version = "2.5.1"
 dependencies = [
+ "base64",
  "clap",
  "crossterm",
  "image",
