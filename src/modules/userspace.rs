@@ -11,11 +11,12 @@ use memchr::{memchr_iter, memmem};
 use crate::helpers::{capitalize, get_cached_is_nerd_font, get_dms_theme, get_noctalia_scheme};
 
 /// Get the active shell with version.
+/// Detects the actual running shell by walking up the process tree via /proc,
+/// rather than relying on $SHELL (which is the login shell, not necessarily the current one).
 pub fn shell() -> String {
-    let shell_path = match env::var("SHELL") {
-        Ok(p) => p,
-        Err(_) => return "unknown".to_string(),
-    };
+    let shell_path = detect_running_shell()
+        .or_else(|| env::var("SHELL").ok())
+        .unwrap_or_else(|| "unknown".to_string());
 
     let shell_name = match shell_path.rsplit('/').next() {
         Some(name) if !name.is_empty() => name,
@@ -56,6 +57,46 @@ pub fn shell() -> String {
         Some(v) => format!("{} {}", capitalize(shell_name), v),
         None => capitalize(shell_name),
     }
+}
+
+/// Walk up the process tree via /proc to find the actual running shell.
+/// Starts from our own PID and checks each ancestor's comm/exe for known shells.
+fn detect_running_shell() -> Option<String> {
+    const KNOWN_SHELLS: &[&str] = &[
+        "fish", "zsh", "bash", "dash", "ksh", "tcsh", "csh", "elvish", "nu", "nushell", "oil",
+        "osh", "yash", "mksh", "oksh", "ion",
+    ];
+
+    let mut pid = std::process::id();
+
+    // Walk up to 16 ancestors to avoid infinite loops
+    for _ in 0..16 {
+        // Read /proc/<pid>/stat to get the parent PID and comm name
+        let stat = fs::read_to_string(format!("/proc/{}/stat", pid)).ok()?;
+
+        // comm is between the first '(' and last ')' in stat
+        let comm_start = memchr::memchr(b'(', stat.as_bytes())? + 1;
+        let comm_end = stat.as_bytes().iter().rposition(|&b| b == b')')?;
+        let comm = &stat[comm_start..comm_end];
+
+        if KNOWN_SHELLS.iter().any(|&s| comm == s) {
+            // Found a shell — resolve its full path from /proc/<pid>/exe
+            let exe = fs::read_link(format!("/proc/{}/exe", pid)).ok()?;
+            return Some(exe.to_string_lossy().into_owned());
+        }
+
+        // Parse PPID (4th field after the comm closing paren)
+        let after_comm = &stat[comm_end + 2..]; // skip ") "
+        let ppid_str = after_comm.split_ascii_whitespace().nth(1)?; // fields: state ppid ...
+        let ppid: u32 = ppid_str.parse().ok()?;
+
+        if ppid <= 1 {
+            break;
+        }
+        pid = ppid;
+    }
+
+    None
 }
 
 // Count RPM packages by querying rpmdb.sqlite directly via dlopen'd libsqlite3.
