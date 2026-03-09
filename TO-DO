@@ -6,3 +6,4 @@ fix :
 15. os-age on arm void ?
 16. better os-age module ?
 18. make it have better AMD gpu names ( amd sucks at naming their gpus in sysfs maake it use vulkaninfo if it detects / in name)
+19. make it append/remove GPU form like prrety name in zfetch
