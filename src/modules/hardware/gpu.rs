@@ -114,6 +114,7 @@ fn clean_gpu_name(name: &str) -> String {
     name.replace("Max-Q", "")
         .replace("Max-P", "")
         .replace("GPU ", "")
+        .replace(" GPU", "")
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
@@ -527,9 +528,9 @@ fn gpu_from_sysfs_multi() -> Option<GpuInfo> {
                     })
                 })
             })
-            .unwrap_or("GPU");
-
-        let full_name = format!("{} {}", vendor_short, display_name);
+            .unwrap_or("");
+        
+        let full_name = format!("{} {}", vendor_short, display_name).trim().to_string();
 
         cards.push(CardInfo {
             vendor_id,
