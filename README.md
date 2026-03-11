@@ -42,6 +42,10 @@ or
 ```
 you can use the provided precompiled binary in release section.
 ```
+## Credits 
+
+Slowfetch => zfetch is a fork of slowfetch , you can find slowfetch at : https://github.com/tuibird/slowfetch
+
 ## Screenshots
 
 ![zfetch preview 1](https://raw.githubusercontent.com/zodium-project/zfetch-rs/refs/heads/stable/preview-1.png)
