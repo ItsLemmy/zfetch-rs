@@ -49,3 +49,7 @@ you can use the provided precompiled binary in release section.
 ![zfetch preview 2](https://raw.githubusercontent.com/zodium-project/zfetch-rs/refs/heads/stable/preview-2.png)
 
 ![zfetch preview 3](https://raw.githubusercontent.com/zodium-project/zfetch-rs/refs/heads/stable/preview-3.png)
+
+## Credits 
+
+Slowfetch => zfetch is a fork of slowfetch , you can find slowfetch at : https://github.com/tuibird/slowfetch
