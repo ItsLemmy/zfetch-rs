@@ -5,82 +5,8 @@
 use std::env;
 use std::path::Path;
 
-use image::imageops::FilterType;
-
 // Default zfetch image embedded in the binary
 const DEFAULT_IMAGE: &[u8] = include_bytes!("../assets/default/zfetch.png");
-
-// Query terminal cell pixel size using CSI 16 t.
-// Response format: CSI 6 ; cell_height ; cell_width t
-fn get_cell_pixel_size() -> (u32, u32) {
-    query_cell_pixel_size().unwrap_or((10, 20))
-}
-
-fn query_cell_pixel_size() -> Option<(u32, u32)> {
-    use std::io::{Read, Write};
-
-    let mut termios: libc::termios = unsafe { std::mem::zeroed() };
-    if unsafe { libc::tcgetattr(0, &mut termios) } != 0 {
-        return None;
-    }
-    let original = termios;
-
-    termios.c_lflag &= !(libc::ICANON | libc::ECHO);
-    termios.c_cc[libc::VMIN] = 0;
-    termios.c_cc[libc::VTIME] = 1;
-
-    if unsafe { libc::tcsetattr(0, libc::TCSANOW, &termios) } != 0 {
-        return None;
-    }
-
-    let mut stdout = std::io::stdout();
-    let _ = stdout.write_all(b"\x1b[16t");
-    let _ = stdout.flush();
-
-    let mut buf = [0u8; 32];
-    let mut len = 0;
-    for byte in std::io::stdin().lock().bytes().flatten() {
-        buf[len] = byte;
-        len += 1;
-        if byte == b't' || len >= 31 {
-            break;
-        }
-    }
-
-    unsafe { libc::tcsetattr(0, libc::TCSANOW, &original) };
-
-    let s = std::str::from_utf8(&buf[..len]).ok()?;
-    let inner = s.strip_prefix("\x1b[6;")?.strip_suffix('t')?;
-    let (h, w) = inner.split_once(';')?;
-    let cell_width: u32 = w.parse().ok()?;
-    let cell_height: u32 = h.parse().ok()?;
-    if cell_width == 0 || cell_height == 0 {
-        return None;
-    }
-    Some((cell_width, cell_height))
-}
-
-// Resize an image to fit the target cell dimensions using Lanczos3
-fn resize_for_display(img: image::DynamicImage, box_cols: u16, box_rows: u16) -> image::DynamicImage {
-    let (cell_w, cell_h) = get_cell_pixel_size();
-    let target_w = box_cols as u32 * cell_w;
-    let target_h = box_rows as u32 * cell_h;
-    img.resize(target_w, target_h, FilterType::Lanczos3)
-}
-
-fn get_cache_dir() -> Result<std::path::PathBuf, String> {
-    let cache_dir = env::var("XDG_CACHE_HOME")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| {
-            env::var("HOME")
-                .map(|h| std::path::PathBuf::from(h).join(".cache"))
-                .unwrap_or_else(|_| std::env::temp_dir())
-        })
-        .join("zfetch");
-    std::fs::create_dir_all(&cache_dir)
-        .map_err(|e| format!("Failed to create cache dir: {e}"))?;
-    Ok(cache_dir)
-}
 
 // Check if terminal requires direct transmission (no file-based Kitty protocol support)
 fn needs_direct_transmission() -> bool {
@@ -117,14 +43,6 @@ fn display_kitty_static(path: &Path, box_cols: u16, box_rows: u16) -> Result<Str
         return display_kitty_direct(path, box_cols, box_rows);
     }
 
-    // Pre-resize for smooth scaling, write resized PNG to cache
-    let img = image::open(path).map_err(|e| format!("Failed to load image: {e}"))?;
-    let resized = resize_for_display(img, box_cols, box_rows);
-
-    let cache_path = get_cache_dir()?.join("resized.png");
-    resized.save_with_format(&cache_path, image::ImageFormat::Png)
-        .map_err(|e| format!("Failed to write resized image: {e}"))?;
-
     // Use file-based transmission for terminals that support it (faster)
     let action = kitty_image::Action::TransmitAndDisplay(
         kitty_image::ActionTransmission {
@@ -139,7 +57,7 @@ fn display_kitty_static(path: &Path, box_cols: u16, box_rows: u16) -> Result<Str
         },
     );
 
-    let mut command = kitty_image::Command::with_payload_from_path(action, &cache_path);
+    let mut command = kitty_image::Command::with_payload_from_path(action, path);
     command.quietness = kitty_image::Quietness::SuppressAll;
     Ok(kitty_image::WrappedCommand::new(command).to_string())
 }
@@ -147,10 +65,9 @@ fn display_kitty_static(path: &Path, box_cols: u16, box_rows: u16) -> Result<Str
 // Display image using direct transmission for terminals like Konsole
 fn display_kitty_direct(path: &Path, box_cols: u16, box_rows: u16) -> Result<String, String> {
 
-    // Load, resize for smooth scaling, and encode as RGBA
+    // Load and encode image as PNG
     let img = image::open(path).map_err(|e| format!("Failed to load image: {e}"))?;
-    let resized = resize_for_display(img, box_cols, box_rows);
-    let rgba = resized.to_rgba8();
+    let rgba = img.to_rgba8();
     let (width, height) = (rgba.width(), rgba.height());
 
     let action = kitty_image::Action::TransmitAndDisplay(
@@ -243,14 +160,20 @@ pub fn display_default_image(box_cols: u16, box_rows: u16) -> Result<String, Str
         return display_image_bytes(DEFAULT_IMAGE, box_cols, box_rows);
     }
 
-    // Pre-resize for smooth scaling, write resized PNG to cache
-    let img = image::load_from_memory(DEFAULT_IMAGE)
-        .map_err(|e| format!("Failed to load default image: {e}"))?;
-    let resized = resize_for_display(img, box_cols, box_rows);
-
-    let cache_path = get_cache_dir()?.join("default.png");
-    resized.save_with_format(&cache_path, image::ImageFormat::Png)
-        .map_err(|e| format!("Failed to write resized image: {e}"))?;
+    // For Kitty/Ghostty, write to cache file and use fast file-based transmission
+    let cache_dir = env::var("XDG_CACHE_HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| {
+            env::var("HOME")
+                .map(|h| std::path::PathBuf::from(h).join(".cache"))
+                .unwrap_or_else(|_| std::env::temp_dir())
+        })
+        .join("zfetch");
+    std::fs::create_dir_all(&cache_dir)
+        .map_err(|e| format!("Failed to create cache dir: {e}"))?;
+    let cache_path = cache_dir.join("default.png");
+    std::fs::write(&cache_path, DEFAULT_IMAGE)
+        .map_err(|e| format!("Failed to write cache image: {e}"))?;
 
     let action = kitty_image::Action::TransmitAndDisplay(
         kitty_image::ActionTransmission {
@@ -274,8 +197,7 @@ pub fn display_default_image(box_cols: u16, box_rows: u16) -> Result<String, Str
 fn display_image_bytes(data: &[u8], box_cols: u16, box_rows: u16) -> Result<String, String> {
 
     let img = image::load_from_memory(data).map_err(|e| format!("Failed to load image: {e}"))?;
-    let resized = resize_for_display(img, box_cols, box_rows);
-    let rgba = resized.to_rgba8();
+    let rgba = img.to_rgba8();
     let (width, height) = (rgba.width(), rgba.height());
 
     let action = kitty_image::Action::TransmitAndDisplay(
