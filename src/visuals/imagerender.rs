@@ -37,10 +37,15 @@ pub fn draw_image_layout(sections: &[Section], image_path: Option<&std::path::Pa
         .map(|section| section.lines.len() + 2)
         .sum();
 
-    // --- step 3: Calculate image box dimensions ---
-    // Image box should be roughly square based on sections height
-    // Terminal cells are typically ~2:1 height:width ratio, so multiply height by 2
-    let image_content_width = (sections_total_height as f64 * 2.0) as usize;
+    // --- step 3: Calculate image box dimensions from image aspect ratio ---
+    // Rows are fixed to match sections height; columns adapt to preserve aspect ratio
+    let image_display_rows = sections_total_height.saturating_sub(2); // Subtract borders
+    let max_image_content_width = terminal_width.saturating_sub(sections_box_width + 1 + 4);
+    let image_content_width = crate::modules::image::image_display_cols(
+        image_path,
+        image_display_rows as u16,
+        max_image_content_width as u16,
+    ) as usize;
     let image_box_width = image_content_width + 4; // Add borders + margins
 
     // Total width needed for side-by-side layout: image_box + gap + sections_box
@@ -160,14 +165,15 @@ fn render_stacked_with_image(
     use std::io::Write;
 
     // --- step 1: Calculate image box dimensions for stacked layout ---
-    // Image box width matches sections width for visual consistency
+    // Image box width matches sections width; height adapts to image aspect ratio
     let image_content_width = sections_content_width;
-
-    // Calculate image box height to maintain ~1:1 aspect ratio
-    // Terminal cells are ~2:1 height:width, so divide total visual width by 2
-    // Visual width = content + 6 (2 borders + 2 margins + 2 for padding)
-    let image_box_total_height = ((sections_content_width + 6) as f64 / 2.0).ceil() as usize;
-    let image_content_height = image_box_total_height.saturating_sub(2); // Subtract borders
+    let max_image_rows = terminal_height.saturating_sub(sections_total_height + 2) as u16;
+    let image_content_height = crate::modules::image::image_display_rows(
+        image_path,
+        image_content_width as u16,
+        max_image_rows,
+    ) as usize;
+    let image_box_total_height = image_content_height + 2; // Add borders
 
     // --- step 2: Check if we have enough vertical space ---
     let stacked_total_height = image_box_total_height + sections_total_height;

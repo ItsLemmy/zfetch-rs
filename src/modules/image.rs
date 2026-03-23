@@ -8,6 +8,100 @@ use std::path::Path;
 // Default zfetch image embedded in the binary
 const DEFAULT_IMAGE: &[u8] = include_bytes!("../assets/default/zfetch.png");
 
+// Query terminal cell pixel size using CSI 16 t.
+// Response format: CSI 6 ; cell_height ; cell_width t
+fn get_cell_pixel_size() -> (u32, u32) {
+    query_cell_pixel_size().unwrap_or((10, 20))
+}
+
+fn query_cell_pixel_size() -> Option<(u32, u32)> {
+    use std::io::{Read, Write};
+
+    let mut termios: libc::termios = unsafe { std::mem::zeroed() };
+    if unsafe { libc::tcgetattr(0, &mut termios) } != 0 {
+        return None;
+    }
+    let original = termios;
+
+    termios.c_lflag &= !(libc::ICANON | libc::ECHO);
+    termios.c_cc[libc::VMIN] = 0;
+    termios.c_cc[libc::VTIME] = 1;
+
+    if unsafe { libc::tcsetattr(0, libc::TCSANOW, &termios) } != 0 {
+        return None;
+    }
+
+    let mut stdout = std::io::stdout();
+    let _ = stdout.write_all(b"\x1b[16t");
+    let _ = stdout.flush();
+
+    let mut buf = [0u8; 32];
+    let mut len = 0;
+    for byte in std::io::stdin().lock().bytes().flatten() {
+        buf[len] = byte;
+        len += 1;
+        if byte == b't' || len >= 31 {
+            break;
+        }
+    }
+
+    unsafe { libc::tcsetattr(0, libc::TCSANOW, &original) };
+
+    let s = std::str::from_utf8(&buf[..len]).ok()?;
+    let inner = s.strip_prefix("\x1b[6;")?.strip_suffix('t')?;
+    let (h, w) = inner.split_once(';')?;
+    let cell_width: u32 = w.parse().ok()?;
+    let cell_height: u32 = h.parse().ok()?;
+    if cell_width == 0 || cell_height == 0 {
+        return None;
+    }
+    Some((cell_width, cell_height))
+}
+
+// Get pixel dimensions of an image from a path or the default embedded image
+fn get_dimensions(path: Option<&Path>) -> (u32, u32) {
+    if let Some(p) = path {
+        image::image_dimensions(p).unwrap_or((1, 1))
+    } else {
+        image::load_from_memory(DEFAULT_IMAGE)
+            .map(|img| (img.width(), img.height()))
+            .unwrap_or((1, 1))
+    }
+}
+
+// Compute display columns from image aspect ratio and fixed rows.
+// Rows are fixed to match the sections height; columns adapt to preserve aspect ratio.
+fn compute_display_cols(img_w: u32, img_h: u32, box_rows: u16, box_cols: u16) -> u32 {
+    if img_h == 0 || img_w == 0 {
+        return box_cols as u32;
+    }
+    let (cell_w, cell_h) = get_cell_pixel_size();
+    let cols = (img_w as f64 / img_h as f64) * box_rows as f64 * (cell_h as f64 / cell_w as f64);
+    (cols.round() as u32).max(1).min(box_cols as u32)
+}
+
+// Compute display rows from image aspect ratio and fixed columns.
+fn compute_display_rows(img_w: u32, img_h: u32, box_cols: u16, max_rows: u16) -> u32 {
+    if img_w == 0 || img_h == 0 {
+        return max_rows as u32;
+    }
+    let (cell_w, cell_h) = get_cell_pixel_size();
+    let rows = (img_h as f64 / img_w as f64) * box_cols as f64 * (cell_w as f64 / cell_h as f64);
+    (rows.round() as u32).max(1).min(max_rows as u32)
+}
+
+// Public: compute how many columns an image should occupy given fixed rows
+pub fn image_display_cols(path: Option<&Path>, box_rows: u16, max_cols: u16) -> u16 {
+    let (img_w, img_h) = get_dimensions(path);
+    compute_display_cols(img_w, img_h, box_rows, max_cols) as u16
+}
+
+// Public: compute how many rows an image should occupy given fixed columns
+pub fn image_display_rows(path: Option<&Path>, box_cols: u16, max_rows: u16) -> u16 {
+    let (img_w, img_h) = get_dimensions(path);
+    compute_display_rows(img_w, img_h, box_cols, max_rows) as u16
+}
+
 // Check if terminal requires direct transmission (no file-based Kitty protocol support)
 fn needs_direct_transmission() -> bool {
     env::var("KONSOLE_VERSION").is_ok() || env::var("WEZTERM_PANE").is_ok()
@@ -43,6 +137,11 @@ fn display_kitty_static(path: &Path, box_cols: u16, box_rows: u16) -> Result<Str
         return display_kitty_direct(path, box_cols, box_rows);
     }
 
+    // Read image dimensions to compute aspect-ratio-correct columns
+    let (img_w, img_h) = image::image_dimensions(path)
+        .map_err(|e| format!("Failed to read image dimensions: {e}"))?;
+    let display_cols = compute_display_cols(img_w, img_h, box_rows, box_cols);
+
     // Use file-based transmission for terminals that support it (faster)
     let action = kitty_image::Action::TransmitAndDisplay(
         kitty_image::ActionTransmission {
@@ -51,7 +150,7 @@ fn display_kitty_static(path: &Path, box_cols: u16, box_rows: u16) -> Result<Str
             ..Default::default()
         },
         kitty_image::ActionPut {
-            columns: box_cols as u32,
+            columns: display_cols,
             rows: box_rows as u32,
             ..Default::default()
         },
@@ -65,10 +164,11 @@ fn display_kitty_static(path: &Path, box_cols: u16, box_rows: u16) -> Result<Str
 // Display image using direct transmission for terminals like Konsole
 fn display_kitty_direct(path: &Path, box_cols: u16, box_rows: u16) -> Result<String, String> {
 
-    // Load and encode image as PNG
+    // Load and encode image as RGBA
     let img = image::open(path).map_err(|e| format!("Failed to load image: {e}"))?;
     let rgba = img.to_rgba8();
     let (width, height) = (rgba.width(), rgba.height());
+    let display_cols = compute_display_cols(width, height, box_rows, box_cols);
 
     let action = kitty_image::Action::TransmitAndDisplay(
         kitty_image::ActionTransmission {
@@ -79,7 +179,7 @@ fn display_kitty_direct(path: &Path, box_cols: u16, box_rows: u16) -> Result<Str
             ..Default::default()
         },
         kitty_image::ActionPut {
-            columns: box_cols as u32,
+            columns: display_cols,
             rows: box_rows as u32,
             ..Default::default()
         },
@@ -175,6 +275,10 @@ pub fn display_default_image(box_cols: u16, box_rows: u16) -> Result<String, Str
     std::fs::write(&cache_path, DEFAULT_IMAGE)
         .map_err(|e| format!("Failed to write cache image: {e}"))?;
 
+    let img = image::load_from_memory(DEFAULT_IMAGE)
+        .map_err(|e| format!("Failed to load default image: {e}"))?;
+    let display_cols = compute_display_cols(img.width(), img.height(), box_rows, box_cols);
+
     let action = kitty_image::Action::TransmitAndDisplay(
         kitty_image::ActionTransmission {
             format: kitty_image::Format::Png,
@@ -182,7 +286,7 @@ pub fn display_default_image(box_cols: u16, box_rows: u16) -> Result<String, Str
             ..Default::default()
         },
         kitty_image::ActionPut {
-            columns: box_cols as u32,
+            columns: display_cols,
             rows: box_rows as u32,
             ..Default::default()
         },
@@ -199,6 +303,7 @@ fn display_image_bytes(data: &[u8], box_cols: u16, box_rows: u16) -> Result<Stri
     let img = image::load_from_memory(data).map_err(|e| format!("Failed to load image: {e}"))?;
     let rgba = img.to_rgba8();
     let (width, height) = (rgba.width(), rgba.height());
+    let display_cols = compute_display_cols(width, height, box_rows, box_cols);
 
     let action = kitty_image::Action::TransmitAndDisplay(
         kitty_image::ActionTransmission {
@@ -209,7 +314,7 @@ fn display_image_bytes(data: &[u8], box_cols: u16, box_rows: u16) -> Result<Stri
             ..Default::default()
         },
         kitty_image::ActionPut {
-            columns: box_cols as u32,
+            columns: display_cols,
             rows: box_rows as u32,
             ..Default::default()
         },
